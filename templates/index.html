@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Service Time Clock Dashboard</title>
+<style>
+  html {
+    font-size: 16px;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background-color: #0f1115;
+    color: #e5e5e5;
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+    transition: background-color 0.4s ease, color 0.4s ease, font-size 0.4s ease;
+  }
+
+  header {
+    background-color: #181a1f;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 1.2rem;
+    font-size: 1.6rem;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    height: 7vh;
+  }
+
+  footer {
+    background-color: #181a1f;
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 1.3rem;
+    color: #b5b5b5;
+    height: 7vh;
+  }
+  .total-idle-footer {
+    color: #ff4d4d;
+    font-weight: 700;
+  }
+
+  .status-container {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .theme-toggle {
+    background: none;
+    border: 2px solid #e5e5e5;
+    border-radius: 50%;
+    width: 2.2rem;
+    height: 2.2rem;
+    cursor: pointer;
+    font-size: 1.3rem;
+    color: #e5e5e5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+  }
+  .theme-toggle:hover {
+    background: rgba(255,255,255,0.1);
+  }
+
+  main {
+    height: calc(100vh - 14vh);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+    grid-auto-rows: minmax(auto, 1fr);
+    align-content: start;
+    justify-content: stretch;
+    gap: 0.8rem;
+    padding: 0.8rem;
+    box-sizing: border-box;
+    transition: all 0.4s ease-in-out;
+  }
+
+  .card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: linear-gradient(145deg, #1a1c22, #101215);
+    border-radius: 10px;
+    padding: 0.8rem 1rem;
+    line-height: 1.1;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+    transition: all 0.4s ease-in-out, transform 0.6s ease;
+  }
+
+  .card.active {
+    border-left: 6px solid #33ff99;
+    box-shadow: 0 0 5px rgba(51, 255, 153, 0.4);
+  }
+
+  .card.idle {
+    border-left: 6px solid #ffdb4d;
+    box-shadow: 0 0 12px rgba(255, 219, 77, 0.4);
+    animation: idleGlow 2s infinite alternate;
+  }
+
+  .card.clockedout {
+    border-left: 6px solid #ff4d4d;
+  }
+
+  @keyframes idleGlow {
+    from { box-shadow: 0 0 6px rgba(255, 219, 77, 0.2); }
+    to { box-shadow: 0 0 12px rgba(255, 219, 77, 0.6); }
+  }
+
+  .clockedout-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.6rem;
+    height: 100%;
+    box-sizing: border-box;
+  }
+
+  .clockedout-container .sub-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    border-left: 6px solid #ff4d4d;
+    background: linear-gradient(145deg, #2b1111, #170808);
+    color: #ffbdbd;
+    border-radius: 10px;
+    padding: 0.8rem 1rem;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.6);
+    box-sizing: border-box;
+  }
+
+  .tech-name { font-size: 1.35rem; font-weight: 700; color: #fff; }
+  .status { font-size: 1.15rem; font-weight: 600; letter-spacing: 0.3px; color: #e0e0e0; }
+  .timing { font-size: 1rem; display: flex; justify-content: space-between; font-weight: 600; color: #bfbfbf; }
+  .details { font-size: 0.95rem; opacity: 0.95; font-weight: 600; letter-spacing: 0.3px; color: #d8d8d8; }
+  .details strong { font-weight: 700; color: #ffffff; }
+
+  body[data-theme='light'] { background-color: #f4f6f8; color: #222; }
+  body[data-theme='light'] header, body[data-theme='light'] footer { background-color: #ffffff; color: #222; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  body[data-theme='light'] .card { background: linear-gradient(145deg, #ffffff, #f0f0f0); color: #222; box-shadow: 0 0 10px rgba(0,0,0,0.15); }
+  body[data-theme='light'] .card.active { border-left: 6px solid #33cc66; }
+  body[data-theme='light'] .card.idle { border-left: 6px solid #ffd633; }
+  body[data-theme='light'] .clockedout-container .sub-card { border-left: 6px solid #ff7b7b; background: linear-gradient(145deg, #ffeaea, #ffdede); color: #6b0000; box-shadow: 0 0 10px rgba(0,0,0,0.15); }
+</style>
+</head>
+<body>
+  <header>
+    <div>Regina Truck | Time Clock</div>
+    <div id="currentTime">--:--:--</div>
+    <div class="status-container">
+      <div id="lastUpdated">Last updated: just now</div>
+      <button class="theme-toggle" id="themeToggle">🌙</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="grid" id="dashboard"></div>
+  </main>
+
+  <footer id="summary">Active: 0 | Idle: 0 | Clocked Out: 0 | <span class="total-idle-footer">Today's Idle Time: 0h 00m</span></footer>
+
+  <script>
+    const dashboard = document.getElementById('dashboard');
+    const currentTimeEl = document.getElementById('currentTime');
+    const lastUpdatedEl = document.getElementById('lastUpdated');
+    const summaryEl = document.getElementById('summary');
+    const themeToggle = document.getElementById('themeToggle');
+
+    function formatTime(minutes) {
+      const hrs = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+    }
+
+    let techs = [];
+    for (let i = 1; i <= 17; i++) {
+      const rand = Math.random();
+      let status = 'Active';
+      if (rand < 0.1) status = 'Idle';
+      else if (rand < 0.5) status = 'Clocked Out';
+      const currentIdle = status === 'Idle' ? Math.floor(Math.random() * 60) : 0;
+      const totalIdle = status === 'Idle' ? currentIdle + Math.floor(Math.random() * 120) : Math.floor(Math.random() * 60);
+      techs.push({
+        name: `Tech ${i}`,
+        status,
+        currentIdle,
+        totalIdle,
+        job: `RO${1000 + i}`,
+        segment: Math.floor(Math.random() * 4) + 1,
+        customer: status === 'Active' ? `Customer ${i}` : '-',
+        hrs: `${(Math.random() * 6 + 1).toFixed(1)} / ${(Math.random() * 6 + 1).toFixed(1)}`
+      });
+    }
+
+    function adjustFontScaling() {
+      const totalTechs = techs.length;
+      let baseSize;
+      if (totalTechs <= 6) baseSize = 18;
+      else if (totalTechs <= 10) baseSize = 17;
+      else if (totalTechs <= 15) baseSize = 16;
+      else if (totalTechs <= 20) baseSize = 15;
+      else baseSize = 14;
+      document.documentElement.style.fontSize = baseSize + 'px';
+    }
+
+    function createCard(t) {
+      const card = document.createElement('div');
+      card.className = `card ${t.status.toLowerCase()}`;
+
+      if (t.status === 'Clocked Out') {
+        card.innerHTML = `
+          <div class="tech-name">${t.name}</div>
+          <div class="status">
+            ${t.status === 'Active' ? '✅' : t.status === 'Idle' ? '⚠️' : ''} ${t.status}
+          </div>
+        `;
+        return card;
+      }
+
+      const currentLine = t.status === 'Active'
+        ? `<span>Current Active: ${formatTime(t.currentIdle)}</span>`
+        : `<span>Current Idle: <span style='color:#ff4d4d;font-weight:700;'>${formatTime(t.currentIdle)}</span></span>`;
+
+      const totalLine = `<span>Today's Idle: <span style='color:#ff4d4d;font-weight:700;'>${formatTime(t.totalIdle)}</span></span>`;
+
+      card.innerHTML = `
+        <div class="tech-name">${t.name}</div>
+        <div class="status">
+          ${t.status === 'Active' ? '✅' : t.status === 'Idle' ? '⚠️' : ''} ${t.status}
+        </div>
+        <div class="timing">
+          ${currentLine}
+          ${totalLine}
+        </div>
+        <div class="details"><strong>${t.job}</strong> | Job ${t.segment} | ${t.customer}</div>
+        <div class="details">Hrs (Actual/Bill): ${t.hrs}</div>
+      `;
+      return card;
+    }
+
+    function render() {
+      dashboard.innerHTML = '';
+      adjustFontScaling();
+
+      let counts = { active: 0, idle: 0, clockedout: 0 };
+      let totalIdleMinutes = 0;
+
+      const idleActive = techs.filter(t => t.status !== 'Clocked Out');
+      const clockedOut = techs.filter(t => t.status === 'Clocked Out');
+
+      idleActive.sort((a, b) => {
+        const order = { 'Idle': 1, 'Active': 2 };
+        return order[a.status] - order[b.status];
+      });
+
+      idleActive.forEach(t => {
+        const card = createCard(t);
+        dashboard.appendChild(card);
+        if (t.status === 'Idle') counts.idle++;
+        else counts.active++;
+        totalIdleMinutes += t.totalIdle;
+      });
+
+      for (let i = 0; i < clockedOut.length; i += 2) {
+        const container = document.createElement('div');
+        container.className = 'clockedout-container';
+
+        const sub1 = document.createElement('div');
+        sub1.className = 'sub-card';
+        sub1.innerHTML = `<div class="tech-name">${clockedOut[i].name}</div><div class="status">${clockedOut[i].status}</div>`;
+        container.appendChild(sub1);
+
+        if (clockedOut[i + 1]) {
+          const sub2 = document.createElement('div');
+          sub2.className = 'sub-card';
+          sub2.innerHTML = `<div class="tech-name">${clockedOut[i + 1].name}</div><div class="status">${clockedOut[i + 1].status}</div>`;
+          container.appendChild(sub2);
+        }
+
+        dashboard.appendChild(container);
+        counts.clockedout += (clockedOut[i + 1] ? 2 : 1);
+      }
+
+      const totalHrs = Math.floor(totalIdleMinutes / 60);
+      const totalMins = totalIdleMinutes % 60;
+      summaryEl.innerHTML = `Active: ${counts.active} | Idle: ${counts.idle} | Clocked Out: ${counts.clockedout} | <span class='total-idle-footer'>Today's Idle Time: ${totalHrs}h ${totalMins}m</span>`;
+    }
+
+    function tickIdleTimes() {
+      techs.forEach(t => {
+        if (t.status === 'Idle') {
+          t.currentIdle += 1;
+          t.totalIdle += 1;
+        }
+      });
+      render();
+      updateLastUpdated();
+    }
+
+    function randomStatusChange() {
+      const randomIndex = Math.floor(Math.random() * techs.length);
+      const t = techs[randomIndex];
+      const statuses = ['Active', 'Idle', 'Clocked Out'];
+      let newStatus = statuses[Math.floor(Math.random() * statuses.length)];
+      if (newStatus !== t.status) {
+        t.status = newStatus;
+        t.currentIdle = 0;
+        render();
+      }
+    }
+
+    function updateClock() {
+      const now = new Date();
+      currentTimeEl.textContent = now.toLocaleTimeString();
+    }
+
+    let lastUpdateSeconds = 0;
+    function updateLastUpdated() {
+      lastUpdateSeconds = 0;
+      lastUpdatedEl.textContent = 'Last updated: just now';
+    }
+
+    function incrementLastUpdated() {
+      lastUpdateSeconds++;
+      lastUpdatedEl.textContent = `Last updated: ${lastUpdateSeconds}s ago`;
+    }
+
+    themeToggle.addEventListener('click', () => {
+      const currentTheme = document.body.getAttribute('data-theme');
+      const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+      document.body.setAttribute('data-theme', newTheme);
+      localStorage.setItem('theme', newTheme);
+      themeToggle.textContent = newTheme === 'light' ? '☀️' : '🌙';
+    });
+
+    function initTheme() {
+      const savedTheme = localStorage.getItem('theme') || 'dark';
+      document.body.setAttribute('data-theme', savedTheme);
+      themeToggle.textContent = savedTheme === 'light' ? '☀️' : '🌙';
+    }
+
+    render();
+    initTheme();
+    setInterval(updateClock, 1000);
+    setInterval(tickIdleTimes, 5000);
+    setInterval(incrementLastUpdated, 1000);
+    setInterval(randomStatusChange, 10000);
+  </script>
+</body>
+</html>
