@@ -53,6 +53,8 @@ def api_timeclock():
     API endpoint returning cached technician data.
     Optional ?branch=### filters by BrnId.
     """
+    import math
+
     branch = request.args.get("branch")
     cache = get_cached_data()
     data = cache.get("data", [])
@@ -60,11 +62,25 @@ def api_timeclock():
     if branch:
         data = [r for r in data if str(r.get("BrnId")) == str(branch)]
 
+    # --- Clean invalid JSON values (e.g., NaN, None) before jsonify ---
+    def clean_json(obj):
+        if isinstance(obj, list):
+            return [clean_json(i) for i in obj]
+        elif isinstance(obj, dict):
+            return {k: clean_json(v) for k, v in obj.items()}
+        elif obj is None or (isinstance(obj, float) and math.isnan(obj)):
+            return None
+        else:
+            return obj
+
+    data = clean_json(data)
+
     response = {
         "last_refresh": cache.get("last_refresh"),
         "record_count": len(data),
         "data": data
     }
+
     return jsonify(response)
 
 # -------------------------------------------------------------------
