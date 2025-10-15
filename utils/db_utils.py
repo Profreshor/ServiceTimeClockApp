@@ -12,12 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from urllib.parse import quote_plus
 from utils.log_utils import setup_logger
 
-
-# -------------------------------------------------------------------
-# Initialize logger once for the module
-# -------------------------------------------------------------------
 logger = setup_logger()
-
 
 # -------------------------------------------------------------------
 # Connection + configuration helpers
@@ -27,9 +22,7 @@ def get_engine():
     Reads SQL connection settings from config.json and returns
     a SQLAlchemy engine + the view name.
     """
-    config_path = os.path.join(os.path.dirname(__file__), '..', 'config.json')
-
-    # Defensive load (in case pathing changes when deployed)
+    config_path = os.path.join(os.path.dirname(__file__), "..", "config.json")
     with open(os.path.abspath(config_path)) as f:
         config = json.load(f)
 
@@ -47,7 +40,8 @@ def get_engine():
         "?driver=ODBC+Driver+17+for+SQL+Server"
     )
 
-    logger.info(f"Connecting to SQL Server: {server} / {database}")
+    # Only log the connection target once at startup, not on every query
+    logger.debug(f"DB Engine created for {server}/{database}")
     engine = create_engine(connection_str, fast_executemany=True)
     return engine, view_name
 
@@ -57,30 +51,46 @@ def get_engine():
 # -------------------------------------------------------------------
 def fetch_punches_today():
     """
-    Extracts all records from the configured SQL view (e.g., dbo.CK_ShopTimePunches_today).
-    Returns a pandas DataFrame.
+    Extracts all records from the configured SQL view.
+    Returns a pandas DataFrame or empty DataFrame on error.
     """
     engine, view_name = get_engine()
     query = text(f"SELECT * FROM {view_name};")
 
     try:
-        logger.info(f"Querying SQL view: {view_name}")
         with engine.connect() as conn:
             df = pd.read_sql(query, conn)
-        logger.info(f"Rows fetched: {len(df)}")
+        logger.info(f"SQL view '{view_name}' returned {len(df)} rows.")
         return df
 
     except SQLAlchemyError as e:
-        logger.error(f"SQL Error while querying {view_name}: {str(e)}")
+        logger.error(f"SQL error querying {view_name}: {e}")
         return pd.DataFrame()
 
 
 # -------------------------------------------------------------------
-# Local test (stand-alone execution)
+# Technician roster
 # -------------------------------------------------------------------
-if __name__ == "__main__":
-    df = fetch_punches_today()
-    if not df.empty:
-        logger.info(f"Sample data preview:\n{df.head()}")
-    else:
-        logger.warning("No data returned from SQL view.")
+def fetch_dim_techs():
+    """
+    Fetches all active technicians from COEMP to build the roster,
+    including those without any punches today.
+    """
+    engine, _ = get_engine()
+    query = text("""
+        SELECT EmpId, Name AS EmpName, BrnId
+        FROM dbo.COEMP WITH (NOLOCK)
+        WHERE Title = 'TECHNICIAN'
+          AND ISNULL(Inactive, 0) = 0
+          AND TRY_CAST(EmpId AS INT) < 1000
+    """)
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(query, conn)
+        logger.info(f"Technician roster loaded — {len(df)} techs.")
+        return df
+
+    except SQLAlchemyError as e:
+        logger.error(f"SQL error fetching technician roster: {e}")
+        return pd.DataFrame()
