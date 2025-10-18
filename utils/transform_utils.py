@@ -153,6 +153,12 @@ def summarize_technicians(df: pd.DataFrame, branch_id: int | None = None) -> pd.
             summaries.append(rec)
 
         result = pd.DataFrame(summaries)
+
+        # -------------------------------------------------------------
+        # Add alias for frontend compatibility
+        # -------------------------------------------------------------
+        result["CurrentActive"] = result["TimeElapsed"].fillna("00:00")
+
         logger.debug(f"Technician summary built for {len(result)} records.")
         return result
 
