@@ -123,33 +123,59 @@ def summarize_technicians(df: pd.DataFrame, branch_id: int | None = None) -> pd.
             # -------------------------------------------------------------
             # Total Idle Time (Accumulated Today)
             # -------------------------------------------------------------
+            # -------------------------------------------------------------
+            # Total Idle Time (Accumulated Today)
+            # -------------------------------------------------------------
             shift_start_today = (
                 att[
                     (att["EmpId"] == emp_id)
                     & (att["DateStart"].dt.date == now.date())
                 ]["DateStart"].min()
             )
-
+            
             if pd.notna(shift_start_today):
+                # All attendance punches for today
+                att_today = att[
+                    (att["EmpId"] == emp_id)
+                    & (att["DateStart"].dt.date == now.date())
+                ].sort_values("DateStart")
+            
+                # All shop-floor (RO) punches for today
                 shop_today = shop[
                     (shop["EmpId"] == emp_id)
                     & (shop["DateStart"].dt.date == now.date())
                 ].copy()
-
+            
+                # Total RO (active work) seconds
                 total_ro_seconds = 0
                 for _, row in shop_today.iterrows():
                     start = row["DateStart"]
                     end = row["DateEnd"] if pd.notna(row["DateEnd"]) else now
                     total_ro_seconds += (end - start).total_seconds()
-
+            
+                # Total shift time (from first clock-in to now)
                 total_shift_seconds = (now - shift_start_today).total_seconds()
-                idle_seconds = max(total_shift_seconds - total_ro_seconds, 0)
+            
+                # Subtract any OFF-clock attendance gaps (e.g., lunch)
+                off_clock_seconds = 0
+                att_rows = att_today.reset_index(drop=True)
+                for i in range(len(att_rows) - 1):
+                    this_end = att_rows.loc[i, "DateEnd"]
+                    next_start = att_rows.loc[i + 1, "DateStart"]
+                    if pd.notna(this_end) and pd.notna(next_start) and this_end < next_start:
+                        off_clock_seconds += (next_start - this_end).total_seconds()
+            
+                # Net on-clock time
+                net_on_clock_seconds = max(total_shift_seconds - off_clock_seconds, 0)
+            
+                # Idle = on-clock time - RO time
+                idle_seconds = max(net_on_clock_seconds - total_ro_seconds, 0)
                 idle_hours = int(idle_seconds // 3600)
                 idle_minutes = int((idle_seconds % 3600) // 60)
                 rec["TotalIdle"] = f"{idle_hours:02}:{idle_minutes:02}"
             else:
                 rec["TotalIdle"] = None
-
+            
             summaries.append(rec)
 
         result = pd.DataFrame(summaries)
